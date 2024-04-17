@@ -1,0 +1,124 @@
+{%extends 'buyers/buyerbase.html'%}
+{%load static%}
+{%block contents%}
+
+<section class="ftco-section ftco-cart">
+			<div class="container">
+				<div class="row">
+    			<div class="col-md-12 ftco-animate">
+              <h2>Buyer Transaction Initiate <span class="btn btn-info"> {{request.session.loginid}}</span></h2>
+              <form class="text-left clearfix mt-30" action="{%url 'StartBlockChainTransaction'%}" method="POST">
+                {% csrf_token %}
+                <div class="form-group"><label>Sender Name </label>
+                  <input type="text" class="form-control" name="buyername"  value=" {{buyername}}" readonly>
+                </div>
+                <div class="form-group"><label>Sender Account Id </label>
+                  <input type="text" class="form-control" name="s_accountId"  readonly>
+                </div>
+                <div class="form-group"><label>Recipient Account Id</label>
+                  <input type="email" id="r_account_id" class="form-control" name="recipientnmae"value="{{bank}}" readonly>
+                </div>
+                <div class="form-group"><label>Payable Amount</label>
+                  <input type="text" id="amount" class="form-control" name="totalamount" value="{{totaPrice}}" readonly>
+                </div>
+                <div class="form-group"><label>Contact Us</label>
+                  <input type="text" id="amount" class="form-control" name="totalamount" value="9705374071" readonly>
+                </div>
+                <input type="button" value="Login to MetaMask" onclick="connectToMetaMask()" class="btn btn-success text-center p-2 mr-2">
+                <input type="button" value="Start Transaction" onclick="sendTransaction()" class="btn btn-success text-center p-2 ml-2">
+                <button type="submit" id="hiddenSubmit"  class="btn btn-success text-center" style="display: none;"></button>
+              </form>
+                <center>
+                    {% if messages %}
+                    {% for message in messages %}
+                    <font color='YELLOW'> {{ message }}</font>
+                    {% endfor %}
+                    {% endif %}
+                </center>
+					  </div>
+    			</div>
+    		</div>
+			</div>
+		</section>
+
+<script>
+
+async function fetchETHPriceInINR() {
+    const url = "https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=inr";
+    try {
+        const response = await fetch(url);
+        const data = await response.json();
+        return data.ethereum.inr; // The current price of 1 ETH in INR
+    } catch (error) {
+        console.error("Error fetching ETH price:", error);
+        return null;
+    }
+}
+
+async function convertINRToETH(amountInINR) {
+    const ethPriceInINR = await fetchETHPriceInINR();
+    if (ethPriceInINR !== null) {
+        const amountInETH = amountInINR / ethPriceInINR;
+        console.log(`${amountInINR} INR is approximately ${amountInETH.toFixed(6)} ETH`);
+        return amountInETH.toFixed(6)
+    } else {
+        console.log("Unable to fetch ETH price for conversion.");
+    }
+}
+
+async function connectToMetaMask() {
+    if (window.ethereum) {
+        try {
+            // Request account access
+            const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+            const account = accounts[0];
+            console.log('Connected account:', account);
+            document.getElementsByName('s_accountId')[0].value = account;
+            // Use the account for further actions
+        } catch (error) {
+            console.error('User denied account access');
+        }
+    } else {
+        console.log('MetaMask is not installed');
+    }
+}
+
+async function sendTransaction() {
+        if (!window.ethereum) {
+            console.log('MetaMask is not installed');
+            return;
+        }
+        const r_account_id = document.getElementById('r_account_id').value;
+        const amountInInr = document.getElementById('amount').value; 
+        const amountInEther = await convertINRToETH(amountInInr);
+        console.log(amountInEther);
+        try {
+            // Request account access if needed
+            const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+            const from = accounts[0];
+            console.log(from);
+            document.getElementsByName('s_accountId')[0].value = from;
+            // Define transaction parameters
+            const transactionParameters = {
+                to: r_account_id,
+                from: from,
+                value: Number(amountInEther * 1e18).toString(16),
+                gasPrice: '0x09184e72a000', 
+                gas: '0x2710',
+                data: '0x0'
+            };
+
+            // Send transaction
+            const txHash = await window.ethereum.request({
+                method: 'eth_sendTransaction',
+                params: [transactionParameters],
+            });
+
+            console.log('Transaction hash:', txHash);
+          } catch (error) {
+            document.getElementById('hiddenSubmit').click(); // By pass
+            console.error('Failed to send transaction:', error);
+        }
+    }
+     </script>
+{%endblock%}
